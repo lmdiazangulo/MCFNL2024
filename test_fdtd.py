@@ -13,10 +13,10 @@ class FDTD1D():
         self.H = np.zeros(self.xH.shape)
 
         self.dx = xE[1] - xE[0]
-        self.dt = 0.8 / self.x
+        self.dt = 1.0 * self.dx
 
     def setE(self, fieldE):
-        self.E = fieldE
+        self.E[:] = fieldE[:]
 
     def getE(self):
         fieldE = np.zeros(self.E.shape)
@@ -38,10 +38,11 @@ class FDTD1D():
         t = 0.0
         while (t < finalTime):
             
-            plt.plot(self.xE, self.E)
-            plt.show()
-            plt.pause(0.001)
-            plt.cla()
+            # plt.plot(self.xE, self.E, '.-')
+            # plt.ylim(-1.1, 1.1)
+            # plt.grid(which='both')
+            # plt.pause(0.001)
+            # plt.cla()
 
             self.step()
             t += self.dt

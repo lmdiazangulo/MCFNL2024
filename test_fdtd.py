@@ -59,5 +59,3 @@ def test_fdtd():
 
     R = np.corrcoef(fdtd.getE(), -initialE)
     assert np.isclose(R[0,1], 1.0)
-
-    #a

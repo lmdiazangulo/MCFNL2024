@@ -23,11 +23,24 @@ class FDTD1D():
     def setH(self, fieldH):
         self.H[:] = fieldH[:]
 
+    def setH(self, fieldH):
+        self.H[:] = fieldH[:]
+
     def getE(self):
         fieldE = np.zeros(self.E.shape)
         fieldE = self.E[:]
         return fieldE
     
+    def getH(self):
+        fieldH = np.zeros(self.H.shape)
+        fieldH = self.H[:]
+        return fieldH
+
+    def getH(self):
+        fieldH = np.zeros(self.H.shape)
+        fieldH = self.H[:]
+        return fieldH
+
     def getH(self):
         fieldH = np.zeros(self.H.shape)
         fieldH = self.H[:]
@@ -47,6 +60,9 @@ class FDTD1D():
         elif self.boundary == "pmc":
             E[0] = E[0] - c / EPSILON_0 * (2 * H[0])
             E[-1] = E[-1] - c / EPSILON_0 * (-2 * H[-1])
+        elif self.boundary == "period":
+            E[0] += - c * (H[0] - H[-1])
+            E[-1] = E[0]
         else:
             raise ValueError("Boundary not defined")
 
@@ -96,3 +112,21 @@ def test_pmc():
     R = np.corrcoef(fdtd.getH(), -initialH)
     assert np.isclose(R[0,1], 1.0)
 
+def test_period():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "period")
+
+    spread = 0.1
+    initialE = np.exp( - ((x-0.1)/spread)**2/2)
+    initialH = np.zeros(fdtd.H.shape)
+
+
+    fdtd.setE(initialE)
+    fdtd.run_until(1.0)
+
+
+    R_E = np.corrcoef(fdtd.getE(), initialE)
+    assert np.isclose(R_E[0,1], 1.0, rtol=1.e-2)
+
+    # R_H = np.corrcoef(initialH, fdtd.getH())
+    assert np.allclose(fdtd.H, initialH, atol=1.e-2)

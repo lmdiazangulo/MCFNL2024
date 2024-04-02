@@ -23,24 +23,11 @@ class FDTD1D():
     def setH(self, fieldH):
         self.H[:] = fieldH[:]
 
-    def setH(self, fieldH):
-        self.H[:] = fieldH[:]
-
     def getE(self):
         fieldE = np.zeros(self.E.shape)
         fieldE = self.E[:]
         return fieldE
     
-    def getH(self):
-        fieldH = np.zeros(self.H.shape)
-        fieldH = self.H[:]
-        return fieldH
-
-    def getH(self):
-        fieldH = np.zeros(self.H.shape)
-        fieldH = self.H[:]
-        return fieldH
-
     def getH(self):
         fieldH = np.zeros(self.H.shape)
         fieldH = self.H[:]
@@ -68,9 +55,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         t = 0.0
-        
-
-        
+       
         while (t < finalTime):
             
             #plt.plot(self.xE, self.E, '.-')

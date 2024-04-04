@@ -115,3 +115,37 @@ def test_period():
 
     # R_H = np.corrcoef(initialH, fdtd.getH())
     assert np.allclose(fdtd.H, initialH, atol=1.e-2)
+
+
+def test_error():
+    error = np.zeros(5)
+    deltax = np.zeros(5)
+    for i in range(5):
+        num = 10**(i+1) +1
+        x = np.linspace(-0.5, 0.5, num)
+        deltax[i] = 1/num
+        fdtd = FDTD1D(x, "pec")
+        spread = 0.1
+        initialE = np.exp( - ((x-0.1)/spread)**2/2)
+        
+        fdtd.setE(initialE)
+        fdtd.step()
+        fdtd.step()
+        N = len(initialE)
+        error[i] = np.sqrt(np.sum((fdtd.getE() - initialE)**2)) / N
+        
+    # plt.plot(deltax, error)
+    # plt.loglog()
+    # plt.grid(which='both')
+    # plt.show()
+    
+    # np.polyfit(np.log10(error), np.log10(deltax), 1)
+    
+    slope = (np.log10(error[-1]) - np.log10(error[0])) / \
+        (np.log10(deltax[-1]) - np.log10(deltax[0]) )
+
+
+    assert np.isclose( slope , 2, rtol=1.e-1)
+    
+    
+

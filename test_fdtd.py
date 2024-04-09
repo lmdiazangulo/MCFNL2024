@@ -5,9 +5,10 @@ EPSILON_0 = 1.0
 MU_0 = 1.0
 
 class FDTD1D():
-    def __init__(self, xE, boundary, relative_epsilon_vector):
+    def __init__(self, xE, boundary, relative_epsilon_vector=None):
         self.xE = xE
         self.xH = (xE[1:] + xE[:-1]) / 2.0
+
 
         self.E = np.zeros(self.xE.shape)
         self.H = np.zeros(self.xH.shape)
@@ -15,7 +16,11 @@ class FDTD1D():
         self.dx = xE[1] - xE[0]
         self.dt = 1.0 * self.dx
 
-        self.epsilon_r = relative_epsilon_vector
+        if relative_epsilon_vector is None:
+            self.epsilon_r = np.ones(self.xE.shape)
+        else:
+            self.epsilon_r = relative_epsilon_vector
+            
 
         self.boundary = boundary
 
@@ -64,8 +69,9 @@ class FDTD1D():
             
             # plt.plot(self.xE, self.E, '.-')
             # plt.ylim(-1.1, 1.1)
+            # plt.title(t)
             # plt.grid(which='both')
-            # plt.pause(0.001)
+            # plt.pause(0.01)
             # plt.cla()
             
             self.step()
@@ -76,7 +82,7 @@ class FDTD1D():
 
 def test_pec():
     x = np.linspace(-0.5, 0.5, num=101)
-    fdtd = FDTD1D(x, "pec", np.ones(x.size))
+    fdtd = FDTD1D(x, "pec")
 
     spread = 0.1
     initialE = np.exp( - (x/spread)**2/2)
@@ -90,7 +96,7 @@ def test_pec():
 def test_pmc():
     x = np.linspace(-0.5, 0.5, num=101)
     y = (x[1:] - x[:-1]) / 2
-    fdtd = FDTD1D(x, "pmc", np.ones(x.size))
+    fdtd = FDTD1D(x, "pmc")
 
     spread = 0.1
     initialH = np.exp( - (y/spread)**2/2)
@@ -103,7 +109,7 @@ def test_pmc():
 
 def test_period():
     x = np.linspace(-0.5, 0.5, num=101)
-    fdtd = FDTD1D(x, "period", np.ones(x.size))
+    fdtd = FDTD1D(x, "period")
 
     spread = 0.1
     initialE = np.exp( - ((x-0.1)/spread)**2/2)
@@ -168,7 +174,7 @@ def test_error():
         num = 10**(i+1) +1
         x = np.linspace(-0.5, 0.5, num)
         deltax[i] = 1/num
-        fdtd = FDTD1D(x, "pec", np.ones(x.size))
+        fdtd = FDTD1D(x, "pec")
         spread = 0.1
         initialE = np.exp( - ((x-0.1)/spread)**2/2)
         

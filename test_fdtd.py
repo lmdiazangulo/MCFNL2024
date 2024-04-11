@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import norm
 import matplotlib.pyplot as plt
 
 EPSILON_0 = 1.0
@@ -14,8 +15,14 @@ class FDTD1D():
 
         self.dx = xE[1] - xE[0]
         self.dt = 1.0 * self.dx
+        self.t = 0
 
         self.boundary = boundary
+
+
+    def add_illumination(self, distribution, t):
+        distribution(t)
+        pass
 
     def setE(self, fieldE):
         self.E[:] = fieldE[:]
@@ -38,8 +45,18 @@ class FDTD1D():
         H = self.H
         c = self.dt/self.dx
 
-        H += - c * (E[1:] - E[:-1])
+        spread = 0.1
         E[1:-1] += - c * (H[1:] - H[:-1])
+        initialE = np.exp( - ((self.t-0.5)/spread)**2/2)
+        self.E[20] += initialE
+        initialE = np.exp( - ((self.t-0.5)/spread)**2/2)
+        self.E[20] += initialE
+        self.t += self.dt/2
+
+        H += - c * (E[1:] - E[:-1])
+        initialH = np.exp( - ((self.t-0.5+self.dt/2)/spread)**2/2)
+        self.H[20] += initialH
+        self.t += self.dt/2
 
         if self.boundary == "pec":
             E[0] = 0.0
@@ -55,17 +72,17 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         t = 0.0
-       
+        
         while (t < finalTime):
-            
-            #plt.plot(self.xE, self.E, '.-')
-            #plt.ylim(-1.1, 1.1)
-            #plt.grid(which='both')
-            #plt.pause(0.001)
-            #plt.cla()
+
+            plt.plot(self.xE, self.E, '.-')
+            plt.ylim(-1.1, 1.1)
+            plt.grid(which='both')
+            plt.pause(0.001)
+            plt.cla()
             
             self.step()
-            t += self.dt
+            # t += self.dt
 
         
 
@@ -148,4 +165,32 @@ def test_error():
     assert np.isclose( slope , 2, rtol=1.e-1)
     
     
+def test_illumination():
+    
+    x = norm(1, 2)
+    print(x)
+    
+    plt.plot(x)
+    plt.show()
+    # x = np.linspace(-0.5, 0.5, 101)
+    # x_sub = x[30:60]
+    # y = (x[1:] - x[:-1]) / 2
+    # fdtd = FDTD1D(x, "pec") 
+    
+    # fdtd.run_until(2.0)
+    # fdtd.step()
+    
+    # E = fdtd.getE()
+    
+ 
+def test_total_field_scattered_field():
+     
+    # x = np.linspace()
+    return
+    
+def g():
+    return 0
 
+    
+    
+     

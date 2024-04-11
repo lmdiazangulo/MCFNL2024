@@ -16,14 +16,18 @@ class FDTD1D():
         self.dx = xE[1] - xE[0]
         self.dt = 1.0 * self.dx
 
+        self.sources = []
+        self.t = 0.0
+
         if relative_epsilon_vector is None:
             self.epsilon_r = np.ones(self.xE.shape)
         else:
             self.epsilon_r = relative_epsilon_vector
-            
-
         self.boundary = boundary
 
+    def addSource(self, source):
+        self.sources.append(source)
+     
     def setE(self, fieldE):
         self.E[:] = fieldE[:]
 
@@ -47,8 +51,13 @@ class FDTD1D():
         c_eps = np.ones(self.epsilon_r.size)
         c_eps[:] = self.dt/self.dx / self.epsilon_r[:]
 
-        H += - self.dt/self.dx *(E[1:] - E[:-1])
         E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
+        for source in self.sources:
+            E[source.location] += source.function(self.t)
+        self.t += self.dt
+        H += - self.dt/self.dx *(E[1:] - E[:-1])
+        for source in self.sources:
+            H[source.location] += source.function(self.t)
 
         if self.boundary == "pec":
             E[0] = 0.0
@@ -63,22 +72,33 @@ class FDTD1D():
             raise ValueError("Boundary not defined")
 
     def run_until(self, finalTime):
-        t = 0.0
-       
-        while (t < finalTime):
-            # if True:    
-            #     plt.plot(self.xE, self.E, '.-')
-            #     plt.plot(self.xH, self.H, '.-')
-            #     plt.ylim(-1.1, 1.1)
-            #     plt.title(t)
-            #     plt.grid(which='both')
-            #     plt.pause(0.01)
-            #     plt.cla()
-            
+        while (self.t <= finalTime):
+            if False:    
+                plt.plot(self.xE, self.E, '.-')
+                plt.plot(self.xH, self.H, '.-')
+                plt.ylim(-1.1, 1.1)
+                plt.title(self.t)
+                plt.grid(which='both')
+                plt.pause(0.02)
+                plt.cla()
             self.step()
-            t += self.dt
 
-        
+class Source():
+    def __init__(self, location, function):
+        self.location = location
+        self.function = function
+    def gaussian(location, center, amplitude, spread):
+        def function(t):
+            return np.exp( - ((t-center)/spread)**2/2) * amplitude
+        return Source(location, function)
+    def square(location, tini, tfin, amplitude):
+        def function(t):
+            if t > tini and t < tfin:
+                return amplitude 
+            else:
+                return 0
+        return Source(location, function)
+          
 
 
 def test_pec():
@@ -196,4 +216,16 @@ def test_error():
 
 
     assert np.isclose( slope , 2, rtol=1.e-1)
-    
+                                
+def test_illumination():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "pec")
+
+    fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
+    fdtd.addSource(Source.gaussian(70, 1.0, -0.5, 0.1))
+
+    fdtd.run_until(1.0)
+    assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-2)
+    assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-2)
+    fdtd.run_until(3.0)
+    assert np.allclose(fdtd.getE(), 0.0, atol = 1e-2)

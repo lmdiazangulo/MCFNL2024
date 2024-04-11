@@ -66,13 +66,14 @@ class FDTD1D():
         t = 0.0
        
         while (t < finalTime):
-            if True:    
-                plt.plot(self.xE, self.E, '.-')
-                plt.ylim(-1.1, 1.1)
-                plt.title(t)
-                plt.grid(which='both')
-                plt.pause(0.01)
-                plt.cla()
+            # if True:    
+            #     plt.plot(self.xE, self.E, '.-')
+            #     plt.plot(self.xH, self.H, '.-')
+            #     plt.ylim(-1.1, 1.1)
+            #     plt.title(t)
+            #     plt.grid(which='both')
+            #     plt.pause(0.01)
+            #     plt.cla()
             
             self.step()
             t += self.dt

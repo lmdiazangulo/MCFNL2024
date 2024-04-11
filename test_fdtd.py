@@ -47,6 +47,11 @@ class FDTD1D():
         c_eps = np.ones(self.epsilon_r.size)
         c_eps[:] = self.dt/self.dx / self.epsilon_r[:]
 
+        # Valor del campo en i=1
+        E_aux_izq = E[1]
+        # Valor del campo en i=N-1
+        E_aux_dch = E[-2]
+
         H += - self.dt/self.dx *(E[1:] - E[:-1])
         E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
 
@@ -166,6 +171,18 @@ def test_period_dielectric():
 
     # R_H = np.corrcoef(initialH, fdtd.getH())
     assert np.allclose(fdtd.H, initialH, atol=1.e-2)
+
+def test_mur():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "mur")
+
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    fdtd.run_until(1.1)
+
+    assert np.allclose(fdtd.getE(), np.zeros_like(fdtd.getE()), atol = 1.e-2)
 
 def test_error():
     error = np.zeros(5)

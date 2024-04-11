@@ -55,7 +55,7 @@ class FDTD1D():
             E[-1] = 0.0
         elif self.boundary == "pmc":
             E[0] = E[0] - c / self.epsilon_r[0] * (2 * H[0])
-            E[-1] = E[-1] - c / self.epsilon_r[-1] * (-2 * H[-1])
+            E[-1] = E[-1] + c / self.epsilon_r[-1] * (2 * H[-1])
         elif self.boundary == "period":
             E[0] += - c_eps[0] * (H[0] - H[-1])
             E[-1] = E[0]
@@ -66,13 +66,13 @@ class FDTD1D():
         t = 0.0
        
         while (t < finalTime):
-            
-            # plt.plot(self.xE, self.E, '.-')
-            # plt.ylim(-1.1, 1.1)
-            # plt.title(t)
-            # plt.grid(which='both')
-            # plt.pause(0.01)
-            # plt.cla()
+            if True:    
+                plt.plot(self.xE, self.E, '.-')
+                plt.ylim(-1.1, 1.1)
+                plt.title(t)
+                plt.grid(which='both')
+                plt.pause(0.01)
+                plt.cla()
             
             self.step()
             t += self.dt
@@ -95,16 +95,15 @@ def test_pec():
 
 def test_pmc():
     x = np.linspace(-0.5, 0.5, num=101)
-    y = (x[1:] - x[:-1]) / 2
     fdtd = FDTD1D(x, "pmc")
 
     spread = 0.1
-    initialH = np.exp( - (y/spread)**2/2)
+    initialE = np.exp( - (x/spread)**2/2)
 
-    fdtd.setH(initialH)
+    fdtd.setE(initialE)
     fdtd.run_until(1.0)
 
-    R = np.corrcoef(fdtd.getH(), -initialH)
+    R = np.corrcoef(fdtd.getE(), initialE)
     assert np.isclose(R[0,1], 1.0)
 
 def test_period():

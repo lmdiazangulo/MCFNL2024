@@ -187,6 +187,18 @@ def test_period_dielectric():
     # R_H = np.corrcoef(initialH, fdtd.getH())
     assert np.allclose(fdtd.H, initialH, atol=1.e-2)
 
+def test_mur():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "mur")
+
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    fdtd.run_until(1.1)
+
+    assert np.allclose(fdtd.getE(), np.zeros_like(fdtd.getE()), atol = 1.e-2)
+
 def test_error():
     error = np.zeros(5)
     deltax = np.zeros(5)

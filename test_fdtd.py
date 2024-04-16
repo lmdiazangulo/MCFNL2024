@@ -20,11 +20,18 @@ class FDTD1D():
         self.sources = []
         self.t = 0.0
 
+        self.sources = []
+        self.t = 0.0
+
         if relative_epsilon_vector is None:
             self.epsilon_r = np.ones(self.xE.shape)
         else:
             self.epsilon_r = relative_epsilon_vector
         self.boundary = boundary
+
+    def addSource(self, source):
+        self.sources.append(source)
+     
 
     def addSource(self, source):
         self.sources.append(source)
@@ -51,12 +58,15 @@ class FDTD1D():
         c = self.dt/self.dx
         c_eps = np.ones(self.epsilon_r.size)
         c_eps[:] = self.dt/self.dx / self.epsilon_r[:]
+        E_aux_izq = E[1]
+        E_aux_dch= E[-2]
+        H += - self.dt/self.dx *(E[1:] - E[:-1])
 
         E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
         for source in self.sources:
             E[source.location] += source.function(self.t)
         self.t += self.dt
-        H += - self.dt/self.dx *(E[1:] - E[:-1])
+        
         for source in self.sources:
             H[source.location] += source.function(self.t)
 

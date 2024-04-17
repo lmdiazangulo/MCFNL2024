@@ -52,7 +52,14 @@ class FDTD1D():
         H = self.H
         c0 = self.dt/self.dx
         c_eps = np.ones(self.epsilon_r.size)
+
         c_eps[:] = c0 / self.epsilon_r[:]
+        E_aux_izq = E[1]
+        E_aux_dch= E[-2]
+
+        H += - c0 *(E[1:] - E[:-1])
+        for source in self.sources:
+            H[source.location] += source.function(self.t)
 
         epsilon = self.epsilon_r * EPSILON_0
         E_factor = (epsilon[1:-1] - self.sigma_vector[1:-1]*self.dt/2)\
@@ -63,9 +70,6 @@ class FDTD1D():
         for source in self.sources:
             E[source.location] += source.function(self.t)
         self.t += self.dt
-        H += - c0 *(E[1:] - E[:-1])
-        for source in self.sources:
-            H[source.location] += source.function(self.t)
 
         if self.boundary == "pec":
             E[0] = 0.0
@@ -76,6 +80,12 @@ class FDTD1D():
         elif self.boundary == "period":
             E[0] += - c_eps[0] * (H[0] - H[-1])
             E[-1] = E[0]
+        elif self.boundary == "mur":
+            cte = (c0-1.0)/(c0 + 1.0)
+            # Left 
+            E[0] = E_aux_izq + cte*( E[1] - E[0])
+            # Right
+            E[-1] = E_aux_dch + cte*( E[-2] - E[-1] )
         else:
             raise ValueError("Boundary not defined")
 

@@ -5,7 +5,7 @@ EPSILON_0 = 1.0
 MU_0 = 1.0
 
 class FDTD1D():
-    def __init__(self, xE, boundary, relative_epsilon_vector=None):
+    def __init__(self, xE, boundary, relative_epsilon_vector=None, sigma_vector = None):
         self.xE = xE
         self.xH = (xE[1:] + xE[:-1]) / 2.0
 
@@ -18,7 +18,10 @@ class FDTD1D():
 
         self.sources = []
         self.t = 0.0
-
+        if sigma_vector is None:
+            self.sigma_vector = np.zeros(self.xE.shape)
+        else:
+            self.sigma_vector = sigma_vector
         if relative_epsilon_vector is None:
             self.epsilon_r = np.ones(self.xE.shape)
         else:
@@ -47,15 +50,20 @@ class FDTD1D():
     def step(self):
         E = self.E
         H = self.H
-        c = self.dt/self.dx
+        c0 = self.dt/self.dx
         c_eps = np.ones(self.epsilon_r.size)
-        c_eps[:] = self.dt/self.dx / self.epsilon_r[:]
+        c_eps[:] = c0 / self.epsilon_r[:]
 
-        E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
+        epsilon = self.epsilon_r * EPSILON_0
+        E_factor = (epsilon[1:-1] - self.sigma_vector[1:-1]*self.dt/2)\
+            /(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2)
+        H_factor = self.dt/(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2) * (1/self.dx)
+        E[1:-1] =  E_factor * E[1:-1] - H_factor * (H[1:] - H[:-1])
+        # E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
         for source in self.sources:
             E[source.location] += source.function(self.t)
         self.t += self.dt
-        H += - self.dt/self.dx *(E[1:] - E[:-1])
+        H += - c0 *(E[1:] - E[:-1])
         for source in self.sources:
             H[source.location] += source.function(self.t)
 
@@ -63,8 +71,8 @@ class FDTD1D():
             E[0] = 0.0
             E[-1] = 0.0
         elif self.boundary == "pmc":
-            E[0] = E[0] - c / self.epsilon_r[0] * (2 * H[0])
-            E[-1] = E[-1] + c / self.epsilon_r[-1] * (2 * H[-1])
+            E[0] = E[0] - c0 / self.epsilon_r[0] * (2 * H[0])
+            E[-1] = E[-1] + c0 / self.epsilon_r[-1] * (2 * H[-1])
         elif self.boundary == "period":
             E[0] += - c_eps[0] * (H[0] - H[-1])
             E[-1] = E[0]
@@ -75,7 +83,7 @@ class FDTD1D():
         while (self.t <= finalTime):
             if False:    
                 plt.plot(self.xE, self.E, '.-')
-                plt.plot(self.xH, self.H, '.-')
+                # plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
                 plt.title(self.t)
                 plt.grid(which='both')
@@ -89,7 +97,7 @@ class Source():
         self.function = function
     def gaussian(location, center, amplitude, spread):
         def function(t):
-            return np.exp( - ((t-center)/spread)**2/2) * amplitude
+            return np.exp( - (((t-center)/spread)**2)/2.0) * amplitude
         return Source(location, function)
     def square(location, tini, tfin, amplitude):
         def function(t):
@@ -241,3 +249,16 @@ def test_illumination():
     assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-2)
     fdtd.run_until(3.0)
     assert np.allclose(fdtd.getE(), 0.0, atol = 1e-2)
+
+def test_conductivity_absorption():
+    x = np.linspace(-0.5, 0.5, num = 101) 
+    sigma_vector = np.zeros(x.size)
+    sigma_vector[:] = 1.0
+    fdtd = FDTD1D(x, "pec", sigma_vector = sigma_vector)
+
+    fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.05))
+    fdtd.run_until(0.4)
+    energy0 = np.sum(fdtd.getE())
+    fdtd.run_until(10.5)
+    energy1 = np.sum(fdtd.getE())
+    assert energy1 < energy0

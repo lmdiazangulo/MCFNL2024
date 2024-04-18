@@ -57,11 +57,11 @@ class FDTD1D():
         H += - self.dt/self.dx *(E[1:] - E[:-1])
         for source in self.sources:
             H[source.location] += source.function(self.t + self.dt/2)
-
+        self.t += self.dt/2
         E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
         for source in self.sources:
             E[source.location] += source.function(self.t)
-        self.t += self.dt
+        self.t += self.dt/2
         
 
         if self.boundary == "pec":
@@ -84,7 +84,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if True:    
+            if False:    
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -249,10 +249,17 @@ def test_illumination():
     fdtd.addSource(Source.gaussian(70, 1.0, -0.5, 0.1))
 
     while (fdtd.t <= finalTime):
+        # plt.plot(fdtd.xE, fdtd.E, '.-')
+        # plt.plot(fdtd.xH, fdtd.H, '.-')
+        # plt.ylim(-1.1, 1.1)
+        # plt.title(fdtd.t)
+        # plt.grid(which='both')
+        # plt.pause(0.02)
+        # plt.cla()
         fdtd.step()
-        # assert np.isclose(fdtd.getE()[5], 0.0, atol=1e-2)
-    assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-2)
-    assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-2)
+        assert np.isclose(fdtd.getE()[5], 0.0, atol=1e-5)
+    assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-5)
+    assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-5)
     
 
 def test_pmc():

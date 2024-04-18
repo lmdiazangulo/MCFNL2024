@@ -26,6 +26,8 @@ class FDTD1D():
         else:
             self.epsilon_r = relative_epsilon_vector
         self.boundary = boundary
+        
+        self.dielectric = None
 
     def addSource(self, source):
         self.sources.append(source)
@@ -63,6 +65,23 @@ class FDTD1D():
         for source in self.sources:
             E[source.location] += source.function(self.t + self.dt - self.dx/2)
         self.t += self.dt
+        
+        if self.dielectric != None:
+            
+            idx_ini = self.dielectric.idx_ini
+            idx_fin = self.dielectric.idx_fin
+            
+            poles = self.dielectric.poles
+            residuals = self.dielectric.residuals
+            
+            k = (1 + poles*self.dt/2) / (1 - poles*self.dt/2)
+            beta = (EPSILON_0 * residuals* self.dt) / (1 - poles*self.dt/2)
+            
+            self.
+            
+            # J = EPSILON_0 * residuals /(1j * ) 
+            
+            pass
         
 
         if self.boundary == "pec":
@@ -398,3 +417,36 @@ def test_pec_block_dielectric():
 
     R = np.corrcoef(fdtd.getE(), -initialE)
     # assert np.isclose(R[0,1], 1.0)
+
+def  test_dispersive_block():
+    x = np.linspace(-0.5, 0.5, num=201)
+    fdtd = FDTD1D(x, "pec")
+    
+    idx_ini = 100
+    idx_fin = 150
+    
+    poles = np.array([ 1, 1.5, 1.2, 4])
+    residuals = np.array([ 0.5, .9, 1.1, 4.8])
+    
+    fdtd.set_dielectric(idx_ini, idx_fin, poles, residuals)
+    
+    fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
+    fdtd.run_until(0.75)
+    
+    w_E = fdtd.getE**2
+    
+    # Test con refelxión y trnasmisión como el panel.
+    
+    
+    E_left = fdtd.getE()[:201]
+    E_right = fdtd.getE()[201:]
+    
+    E_left_max = np.max(E_left)
+    E_right_max = np.max(E_right)
+    E_right_min = np.min(E_right)
+
+    Reflection = np.abs(E_right_min/E_left_max)
+    Transmission = np.abs(E_right_max/E_left_max)
+    
+    assert  Reflection + Transmission < 1
+        

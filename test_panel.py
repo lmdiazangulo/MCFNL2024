@@ -37,10 +37,10 @@ class Panel():
     def denominator(self, w):
         return self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] + self.phi(w)[1,0]*ETA_0**2 + self.phi(w)[1,1]*ETA_0
     
-    def getReflectionCoefficient(self, w):
+    def getTransmissionCoefficient(self, w):
         return 2*ETA_0/self.denominator(w)
         
-    def getTransmissionCoefficient(self, w):
+    def getReflectionCoefficient(self, w):
         return (self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] - self.phi(w)[1,0]*ETA_0**2 - self.phi(w)[1,1]*ETA_0)/(
                 self.denominator(w)
         )
@@ -65,3 +65,13 @@ def test_non_power_dissipation():
 
     # 3.- Obtengo algo
     assert np.allclose(np.abs(R)**2 + np.abs(T)**2, 1.0) # Assert comprueba que la condición es cierta y si no salta error
+
+def test_void_panel():
+    panel = Panel(eps_r =  1.0, mu_r = 1.0, sigma = 0.0, thickness = 1e-3)
+    fq = 1e6
+    w = 2.0*np.pi*fq
+    
+    R = panel.getReflectionCoefficient(w)
+    T = panel.getTransmissionCoefficient(w)
+
+    assert np.allclose(np.abs(T)**2, 1.0) 

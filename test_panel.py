@@ -37,10 +37,10 @@ class Panel():
     def denominator(self, w):
         return self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] + self.phi(w)[1,0]*ETA_0**2 + self.phi(w)[1,1]*ETA_0
     
-    def getReflectionCoefficient(self, w):
+    def getTransmissionCoefficient(self, w):
         return 2*ETA_0/self.denominator(w)
         
-    def getTransmissionCoefficient(self, w):
+    def getReflectionCoefficient(self, w):
         return (self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] - self.phi(w)[1,0]*ETA_0**2 - self.phi(w)[1,1]*ETA_0)/(
                 self.denominator(w)
         )

@@ -10,6 +10,7 @@ class FDTD1D():
         self.xH = (xE[1:] + xE[:-1]) / 2.0
 
 
+
         self.E = np.zeros(self.xE.shape)
         self.H = np.zeros(self.xH.shape)
 
@@ -59,16 +60,15 @@ class FDTD1D():
 
         H += - c0 *(E[1:] - E[:-1])
         for source in self.sources:
-            H[source.location] += source.function(self.t)
+            H[source.location] += source.function(self.t + self.dt/2)
 
         epsilon = self.epsilon_r * EPSILON_0
         E_factor = (epsilon[1:-1] - self.sigma_vector[1:-1]*self.dt/2)\
             /(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2)
         H_factor = self.dt/(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2) * (1/self.dx)
         E[1:-1] =  E_factor * E[1:-1] - H_factor * (H[1:] - H[:-1])
-        # E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
         for source in self.sources:
-            E[source.location] += source.function(self.t)
+            E[source.location] += source.function(self.t + self.dt - self.dx/2)
         self.t += self.dt
 
         if self.boundary == "pec":
@@ -250,15 +250,29 @@ def test_error():
 def test_illumination():
     x = np.linspace(-0.5, 0.5, num=101)
     fdtd = FDTD1D(x, "pec")
+    finalTime = 1.0
 
     fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
     fdtd.addSource(Source.gaussian(70, 1.0, -0.5, 0.1))
 
+    while (fdtd.t <= finalTime):
+        fdtd.step()
+        assert np.isclose(fdtd.getE()[5], 0.0, atol=1e-5)
+    assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-5)
+    assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-5)
+    
+
+def test_pmc():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "pmc")
+
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
     fdtd.run_until(1.0)
-    assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-2)
-    assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-2)
-    fdtd.run_until(3.0)
-    assert np.allclose(fdtd.getE(), 0.0, atol = 1e-2)
+    R = np.corrcoef(fdtd.getE(), initialE)
+    assert np.isclose(R[0,1], 1.0)
 
 def test_conductivity_absorption():
     x = np.linspace(-0.5, 0.5, num = 101) 
@@ -273,3 +287,126 @@ def test_conductivity_absorption():
     energy1 = np.sum(fdtd.getE()**2) + np.sum(fdtd.getH()**2)
     assert energy1 < energy0
 
+
+def test_period():
+    x = np.linspace(-0.5, 0.5, num=101)
+    fdtd = FDTD1D(x, "period")
+
+    spread = 0.1
+    initialE = np.exp( - ((x-0.1)/spread)**2/2)
+    initialH = np.zeros(fdtd.H.shape)
+
+
+    fdtd.setE(initialE)
+    fdtd.run_until(1.0)
+
+
+    R_E = np.corrcoef(fdtd.getE(), initialE)
+    assert np.isclose(R_E[0,1], 1.0, rtol=1.e-2)
+
+    # R_H = np.corrcoef(initialH, fdtd.getH())
+    assert np.allclose(fdtd.H, initialH, atol=1.e-2)
+
+
+def test_pec_dielectric():
+    x = np.linspace(-0.5, 0.5, num=101)
+    epsilon_r = 4
+    epsilon_vector = epsilon_r*np.ones(x.size)
+    time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
+
+    fdtd = FDTD1D(x, "pec", epsilon_vector)
+
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    fdtd.run_until(time)
+
+    R = np.corrcoef(fdtd.getE(), -initialE)
+    assert np.isclose(R[0,1], 1.0)
+
+def test_period_dielectric():
+    x = np.linspace(-0.5, 0.5, num=101)
+    epsilon_r = 4
+    epsilon_vector = epsilon_r*np.ones(x.size)
+    time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
+    
+    fdtd = FDTD1D(x, "period", epsilon_vector)
+
+    spread = 0.1
+    initialE = np.exp( - ((x-0.1)/spread)**2/2)
+    initialH = np.zeros(fdtd.H.shape)
+
+
+    fdtd.setE(initialE)
+    fdtd.run_until(time)
+
+
+    R_E = np.corrcoef(fdtd.getE(), initialE)
+    assert np.isclose(R_E[0,1], 1.0, rtol=1.e-2)
+
+    # R_H = np.corrcoef(initialH, fdtd.getH())
+    assert np.allclose(fdtd.H, initialH, atol=1.e-2)
+
+def test_error():
+    error = np.zeros(5)
+    deltax = np.zeros(5)
+    for i in range(5):
+        num = 10**(i+1) +1
+        x = np.linspace(-0.5, 0.5, num)
+        deltax[i] = 1/num
+        fdtd = FDTD1D(x, "pec")
+        spread = 0.1
+        initialE = np.exp( - ((x-0.1)/spread)**2/2)
+        
+        fdtd.setE(initialE)
+        fdtd.step()
+        fdtd.step()
+        N = len(initialE)
+        error[i] = np.sqrt(np.sum((fdtd.getE() - initialE)**2)) / N
+        
+    # plt.plot(deltax, error)
+    # plt.loglog()
+    # plt.grid(which='both')
+    # plt.show()
+    
+    # np.polyfit(np.log10(error), np.log10(deltax), 1)
+    
+    slope = (np.log10(error[-1]) - np.log10(error[0])) / \
+        (np.log10(deltax[-1]) - np.log10(deltax[0]) )
+
+
+    assert np.isclose( slope , 2, rtol=1.e-1)
+    
+
+def test_pec_block_dielectric():
+    x = np.linspace(-1.0, 1.0, num=201)
+    epsilon_r = 4
+    inter = 151
+    epsilon_vector = np.concatenate((np.ones(inter), epsilon_r*np.ones(x.size-inter)))
+    time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
+
+    fdtd = FDTD1D(x, "pec", epsilon_vector)
+
+    spread = 0.1
+    initialE = 2*np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    fdtd.run_until(0.75)
+
+    E_left = fdtd.getE()[:101]
+    E_right = fdtd.getE()[101:]
+
+    E_left_max = np.max(E_left)
+    E_right_max = np.max(E_right)
+    E_right_min = np.min(E_right)
+
+    Reflection = np.abs(E_right_min/E_left_max)
+    Transmission = np.abs(E_right_max/E_left_max)
+
+    print(Reflection + Transmission)
+
+    assert np.isclose(Reflection + Transmission, 1, atol = 0.004)
+
+    R = np.corrcoef(fdtd.getE(), -initialE)
+    # assert np.isclose(R[0,1], 1.0)

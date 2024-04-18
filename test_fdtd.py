@@ -58,11 +58,11 @@ class FDTD1D():
         H += - self.dt/self.dx *(E[1:] - E[:-1])
         for source in self.sources:
             H[source.location] += source.function(self.t + self.dt/2)
-        self.t += self.dt/2
+        
         E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
         for source in self.sources:
-            E[source.location] += source.function(self.t)
-        self.t += self.dt/2
+            E[source.location] += source.function(self.t + self.dt - self.dx/2)
+        self.t += self.dt
         
 
         if self.boundary == "pec":

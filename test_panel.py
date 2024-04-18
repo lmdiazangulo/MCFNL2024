@@ -65,3 +65,13 @@ def test_non_power_dissipation():
 
     # 3.- Obtengo algo
     assert np.allclose(np.abs(R)**2 + np.abs(T)**2, 1.0) # Assert comprueba que la condición es cierta y si no salta error
+
+def test_void_panel():
+    panel = Panel(eps_r =  1.0, mu_r = 1.0, sigma = 0.0, thickness = 1e-3)
+    fq = 1e6
+    w = 2.0*np.pi*fq
+    
+    R = panel.getReflectionCoefficient(w)
+    T = panel.getTransmissionCoefficient(w)
+
+    assert np.allclose(np.abs(T)**2, 1.0) 

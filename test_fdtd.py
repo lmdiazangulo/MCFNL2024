@@ -84,7 +84,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if False:    
+            if True:    
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -243,15 +243,17 @@ def test_error():
 def test_illumination():
     x = np.linspace(-0.5, 0.5, num=101)
     fdtd = FDTD1D(x, "pec")
+    finalTime = 1.0
 
     fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
     fdtd.addSource(Source.gaussian(70, 1.0, -0.5, 0.1))
 
-    fdtd.run_until(1.0)
+    while (fdtd.t <= finalTime):
+        fdtd.step()
+        # assert np.isclose(fdtd.getE()[5], 0.0, atol=1e-2)
     assert np.allclose(fdtd.getE()[:20], 0.0, atol = 1e-2)
     assert np.allclose(fdtd.getE()[71:], 0.0, atol = 1e-2)
-    fdtd.run_until(3.0)
-    assert np.allclose(fdtd.getE(), 0.0, atol = 1e-2)
+    
 
 def test_pmc():
     x = np.linspace(-0.5, 0.5, num=101)

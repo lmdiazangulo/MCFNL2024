@@ -266,9 +266,10 @@ def test_conductivity_absorption():
     sigma_vector[:] = 1.0
     fdtd = FDTD1D(x, "pec", sigma_vector = sigma_vector)
 
-    fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.05))
-    fdtd.run_until(0.4)
-    energy0 = np.sum(fdtd.getE())
-    fdtd.run_until(10.5)
-    energy1 = np.sum(fdtd.getE())
+    fdtd.addSource(Source.gaussian(10, 0.5, 0.5, 0.05))
+    fdtd.run_until(2.0)
+    energy0 = np.sum(fdtd.getE()**2) + np.sum(fdtd.getH()**2)
+    fdtd.run_until(5.0)
+    energy1 = np.sum(fdtd.getE()**2) + np.sum(fdtd.getH()**2)
     assert energy1 < energy0
+

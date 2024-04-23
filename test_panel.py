@@ -18,12 +18,19 @@ class Panel():
         self.mu_r = mu_r
         self.sigma = sigma
         self.thickness = thickness
+
+    def get_epsC(self, w):
+        self.epsC = self.eps_r * EPSILION_0-1j*self.sigma/w
+
+    @staticmethod
+    def gamma(w, epsC, mu):
+        return 1j * w *np.sqrt(mu * epsC)
         
     def phi(self, w):
+        self.get_epsC(w)
+        epsC = self.epsC
         mu = self.mu_r * MU_0
-        epsC = self.eps_r * EPSILION_0-1j*self.sigma/w
-        gamma = 1j * w *np.sqrt(mu * epsC)
-        gd = gamma*self.thickness
+        gd = self.gamma(w, epsC, mu)*self.thickness
         eta = np.sqrt(mu/epsC)
         
         return np.array(
@@ -46,6 +53,33 @@ class Panel():
         )
 
 
+class Panel_c(Panel):
+    def __init__(self, eps_c, w):
+        assert len(eps_c) == len(w)
+        self.eps_c_array = eps_c # hay que pasar todas las variables de Panel
+        # self.eps_c = eps_c
+        self.w = w
+
+    def get_epsC(self, w):
+        id = (np.abs(self.w - w)).argmin()
+        self.epsC = self.eps_c_array[id]
+
+    def getTransmissionCoefficient_c(self):
+        dim = len(self.w)
+        T = np.zeros(dim)
+        for i in range(dim):
+            eps_c = self.eps_c[i]
+            T[i] = self.getTransmissionCoefficient(self.w[i],eps_c)
+        return T
+
+    def getReflectionCoefficient_c(self):
+        dim = len(self.w)
+        R = np.zeros(dim)
+        for i in range(dim):
+            R[i] = self.getReflectionCoefficient(self.w[i])
+        return R
+
+
 
 # Primero escribimos lo que queremos que haga el programa, no lo que tiene que tener "debajo"
 # Cómo nos gustaría poder usarlo? Qué tiene que hacer bien para que me crea que está funcionando?
@@ -58,6 +92,7 @@ def test_non_power_dissipation():
     panel = Panel(eps_r =  3.0, mu_r = 1.0, sigma = 0.0, thickness = 1e-3)
     fq = 1e6
     w = 2.0*np.pi*fq
+    
     
     # 2.- Y haga algo
     R = panel.getReflectionCoefficient(w)

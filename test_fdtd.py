@@ -10,8 +10,6 @@ class FDTD1D():
         self.xE = xE
         self.xH = (xE[1:] + xE[:-1]) / 2.0
 
-
-
         self.E = np.zeros(self.xE.shape)
         self.H = np.zeros(self.xH.shape)
 
@@ -47,6 +45,18 @@ class FDTD1D():
         fieldH = np.zeros(self.H.shape)
         fieldH = self.H[:]
         return fieldH
+    
+    def set_dielectric(self, idx_ini, idx_fin, poles, residuals):
+        self.dielectric = {
+            "idx_ini":idx_ini,
+            "idx_fin":idx_fin,
+            "idx_poles":poles,
+            "idx_residuals":residuals,
+        }
+        # self.dielectric.idx_ini = idx_ini   
+        # self.dielectric.idx_fin = idx_fin   
+        # self.dielectric.poles = poles     
+        # self.dielectric.residuals = residuals 
 
     def step(self):
         E = self.E
@@ -68,16 +78,14 @@ class FDTD1D():
         
         if self.dielectric != None:
             
-            idx_ini = self.dielectric.idx_ini
-            idx_fin = self.dielectric.idx_fin
+            # idx_ini = self.dielectric.idx_ini
+            # idx_fin = self.dielectric.idx_fin
+            # poles = self.dielectric.poles
+            # residuals = self.dielectric.residuals
             
-            poles = self.dielectric.poles
-            residuals = self.dielectric.residuals
+            # k = (1 + poles*self.dt/2) / (1 - poles*self.dt/2)
+            # beta = (EPSILON_0 * residuals* self.dt) / (1 - poles*self.dt/2)
             
-            k = (1 + poles*self.dt/2) / (1 - poles*self.dt/2)
-            beta = (EPSILON_0 * residuals* self.dt) / (1 - poles*self.dt/2)
-            
-            self.
             
             # J = EPSILON_0 * residuals /(1j * ) 
             
@@ -104,7 +112,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if False:    
+            if True:    
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -419,27 +427,29 @@ def test_pec_block_dielectric():
     # assert np.isclose(R[0,1], 1.0)
 
 def  test_dispersive_block():
-    x = np.linspace(-0.5, 0.5, num=201)
+    num=201
+    x = np.linspace(-0.5, 0.5, num)
     fdtd = FDTD1D(x, "pec")
     
-    idx_ini = 100
-    idx_fin = 150
+    idx_ini = 150
+    idx_fin = num
     
     poles = np.array([ 1, 1.5, 1.2, 4])
     residuals = np.array([ 0.5, .9, 1.1, 4.8])
     
     fdtd.set_dielectric(idx_ini, idx_fin, poles, residuals)
     
-    fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    # fdtd.addSource(Source.gaussian(90, 0.5, 0.5, 0.1))
     fdtd.run_until(0.75)
-    
-    w_E = fdtd.getE**2
     
     # Test con refelxión y trnasmisión como el panel.
     
-    
-    E_left = fdtd.getE()[:201]
-    E_right = fdtd.getE()[201:]
+    E_left = fdtd.getE()[:101]
+    E_right = fdtd.getE()[101:]
     
     E_left_max = np.max(E_left)
     E_right_max = np.max(E_right)
@@ -447,6 +457,51 @@ def  test_dispersive_block():
 
     Reflection = np.abs(E_right_min/E_left_max)
     Transmission = np.abs(E_right_max/E_left_max)
+
+    print(Reflection + Transmission)
     
     assert  Reflection + Transmission < 1
         
+def test_dispersive_panel():
+    num=201
+    x = np.linspace(-0.5, 0.5, num)
+    fdtd = FDTD1D(x, "pec")
+    
+    idx_ini = 150
+    idx_fin = num
+    
+    poles = np.array([ 1, 1.5, 1.2, 4])
+    residuals = np.array([ 0.5, .9, 1.1, 4.8])
+    
+    fdtd.set_dielectric(idx_ini, idx_fin, poles, residuals)
+    
+    spread = 0.1
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+    # fdtd.addSource(Source.gaussian(90, 0.5, 0.5, 0.1))
+    fdtd.run_until(0.75)
+    
+    # Test con refelxión y trnasmisión como el panel.
+    
+    E_left = fdtd.getE()[:101]
+    E_right = fdtd.getE()[101:]
+    
+    E_left_max = np.max(E_left)
+    E_right_max = np.max(E_right)
+    E_right_min = np.min(E_right)
+
+    Reflection = np.abs(E_right_min/E_left_max)
+    Transmission = np.abs(E_right_max/E_left_max)
+
+    from test_panel import Panel_c
+
+    panel = Panel_c(w)
+    fq = 1e6
+    w = 2.0*np.pi*fq
+    
+    R = panel.getReflectionCoefficient_c(w)
+    T = panel.getTransmissionCoefficient_c(w)
+
+    assert np.isclose(Reflection, R)
+    assert np.isclose(Transmission, T)

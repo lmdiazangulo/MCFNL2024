@@ -1,8 +1,43 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.constants import speed_of_light
 
-EPSILON_0 = 1.0
-MU_0 = 1.0
+
+EPSILON_0 = 8.85e-12
+MU_0 = np.pi * 4 * 1e-7
+ETA_0 = np.sqrt(MU_0/EPSILON_0)
+class Panel():
+    def __init__(self, eps_r, mu_r, sigma, thickness):
+        self.eps_r = eps_r
+        self.mu_r = mu_r
+        self.sigma = sigma
+        self.thickness = thickness
+        
+    def phi(self, w):
+        mu = self.mu_r * MU_0
+        epsC = self.eps_r * EPSILON_0-1j*self.sigma/w
+        gamma = 1j * w *np.sqrt(mu * epsC)
+        gd = gamma*self.thickness
+        eta = np.sqrt(mu/epsC)
+        
+        return np.array(
+                [
+                [np.cosh(gd),     eta * np.sinh(gd)],
+                [1/eta*np.sinh(gd),     np.cosh(gd)]
+                ]
+            )
+        
+
+    def denominator(self, w):
+        return self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] + self.phi(w)[1,0]*ETA_0**2 + self.phi(w)[1,1]*ETA_0
+    
+    def getTransmissionCoefficient(self, w):
+        return 2*ETA_0/self.denominator(w)
+        
+    def getReflectionCoefficient(self, w):
+        return (self.phi(w)[0,0] * ETA_0 + self.phi(w)[0,1] - self.phi(w)[1,0]*ETA_0**2 - self.phi(w)[1,1]*ETA_0)/(
+                self.denominator(w)
+        )
 
 class FDTD1D():
     def __init__(self, xE, boundary, relative_epsilon_vector=None, sigma_vector = None):
@@ -62,7 +97,7 @@ class FDTD1D():
         for source in self.sources:
             H[source.location] += source.function(self.t + self.dt/2)
 
-        epsilon = self.epsilon_r * EPSILON_0
+        epsilon = self.epsilon_r 
         E_factor = (epsilon[1:-1] - self.sigma_vector[1:-1]*self.dt/2)\
             /(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2)
         H_factor = self.dt/(epsilon[1:-1] + self.sigma_vector[1:-1]*self.dt/2) * (1/self.dx)
@@ -91,7 +126,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if False:    
+            if True:    
                 plt.plot(self.xE, self.E, '.-')
                 # plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -274,6 +309,67 @@ def test_pmc():
     R = np.corrcoef(fdtd.getE(), initialE)
     assert np.isclose(R[0,1], 1.0)
 
+def test_conductor_panel():
+    x = np.linspace(-0.5, 0.5, num = 101) 
+    sigma_vector = np.zeros(x.size)
+    # er = np.ones(x.size)
+    # er[50:80] = 2
+    sigma_panel = 15.0
+    sigma_vector[50:55] = sigma_panel
+    fdtd = FDTD1D(x, "mur", sigma_vector = sigma_vector)
+    # fdtd.dt *= 0.1
+
+    t_medida = np.arange(0, 6, step = fdtd.dt)
+
+    source = Source.gaussian(10, 0.5, 1, 0.05)
+    fdtd.addSource(source)
+    E_incidente = [source.function(t) for t in t_medida]
+
+    # Recogemos la reflejada
+    E_reflejada = []
+    E_transmitida = []
+
+    for _ in t_medida:
+        E_reflejada.append(fdtd.getE()[5])
+        E_transmitida.append(fdtd.getE()[-10])
+        fdtd.step()
+        # plt.plot(fdtd.xE, fdtd.E, '.-')
+        # # plt.plot(self.xH, self.H, '.-')
+        # plt.ylim(-1.1, 1.1)
+        # plt.title(fdtd.t)
+        # plt.grid(which='both')
+        # plt.pause(0.02)
+        # plt.cla()
+
+    tSI = t_medida / speed_of_light
+    dtSI = fdtd.dt / speed_of_light
+    fqSI = np.fft.fftshift(np.fft.fftfreq(len(t_medida), d = fdtd)) 
+    fqSI = np.fft.fftshift(np.fft.fftfreq(len(tSI), d = dtSI)) 
+    Freflejada = np.fft.fftshift(np.fft.fft(E_reflejada)) 
+    Fincidente = np.fft.fftshift(np.fft.fft(E_incidente)) 
+    Ftransmitida = np.fft.fftshift(np.fft.fft(E_transmitida)) 
+
+
+    freq_filter = fq != 0
+    fq = fq[freq_filter]
+    panel = Panel(eps_r = 1.0, mu_r = 1.0, sigma = sigma_panel/EPSILON_0/speed_of_light**2, thickness = 5 * fdtd.dx)
+    Rnum = (np.abs(Freflejada)/np.abs(Fincidente))[freq_filter]
+    Tnum = (np.abs(Ftransmitida)/np.abs(Fincidente))[freq_filter]
+
+    w = 2 * np.pi * fq
+    R = [panel.getReflectionCoefficient(w) for w in w]
+    T = [panel.getTransmissionCoefficient(w) for w in w]
+    plt.plot(fq, Rnum, '.', label = 'R numérico')
+    plt.plot(fq, Tnum, '.', label = 'T numérico')
+    plt.plot(fq, np.abs(R), label = 'R')
+    plt.plot(fq, np.abs(T), label = 'T')
+    plt.legend()
+    plt.ylim(0, 1.1)
+    plt.show()
+
+test_conductor_panel()
+    
+
 def test_conductivity_absorption():
     x = np.linspace(-0.5, 0.5, num = 101) 
     sigma_vector = np.zeros(x.size)
@@ -281,7 +377,7 @@ def test_conductivity_absorption():
     fdtd = FDTD1D(x, "pec", sigma_vector = sigma_vector)
 
     fdtd.addSource(Source.gaussian(10, 0.5, 0.5, 0.05))
-    fdtd.run_until(2.0)
+    fdtd.run_until(1.0)
     energy0 = np.sum(fdtd.getE()**2) + np.sum(fdtd.getH()**2)
     fdtd.run_until(5.0)
     energy1 = np.sum(fdtd.getE()**2) + np.sum(fdtd.getH()**2)

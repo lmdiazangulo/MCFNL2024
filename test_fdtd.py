@@ -6,15 +6,22 @@ EPSILON_0 = 1.0
 MU_0 = 1.0
 
 class FDTD1D():
-    def __init__(self, xE, boundary, relative_epsilon_vector=None):
+    def __init__(self, xE, boundary, dielectric=None, relative_epsilon_vector=None):
         self.xE = xE
         self.xH = (xE[1:] + xE[:-1]) / 2.0
+
+        if dielectric is None:
+            self.diec_ex = 0
+        else:
+            self.diec_ex = 1
+            self.dielectric = dielectric
+            self.J = np.zeros((self.dielectric["poles"].shape[0], self.xE.shape[0]))
 
         self.E = np.zeros(self.xE.shape)
         self.H = np.zeros(self.xH.shape)
 
         self.dx = xE[1] - xE[0]
-        self.dt = 1.0 * self.dx
+        self.dt = 1 * self.dx
 
         self.sources = []
         self.t = 0.0
@@ -24,8 +31,6 @@ class FDTD1D():
         else:
             self.epsilon_r = relative_epsilon_vector
         self.boundary = boundary
-        
-        self.dielectric = None
 
     def addSource(self, source):
         self.sources.append(source)
@@ -45,22 +50,28 @@ class FDTD1D():
         fieldH = np.zeros(self.H.shape)
         fieldH = self.H[:]
         return fieldH
-    
-    def set_dielectric(self, idx_ini, idx_fin, poles, residuals):
-        self.dielectric = {
-            "idx_ini":idx_ini,
-            "idx_fin":idx_fin,
-            "idx_poles":poles,
-            "idx_residuals":residuals,
-        }
-        # self.dielectric.idx_ini = idx_ini   
-        # self.dielectric.idx_fin = idx_fin   
-        # self.dielectric.poles = poles     
-        # self.dielectric.residuals = residuals 
 
     def step(self):
         E = self.E
         H = self.H
+
+        if self.diec_ex == 1:
+            J = self.J
+            idx_ini = self.dielectric["idx_ini"]
+            idx_fin = self.dielectric["idx_fin"]
+            eps_inf = self.dielectric["eps_inf"]
+            sigma = self.dielectric["sigma"]
+            poles = self.dielectric["poles"]
+            residuals = self.dielectric["residuals"]
+
+            print(idx_ini+1, idx_fin-1)
+            print(idx_ini, idx_fin-2)
+            H_old_1 = H[idx_ini:idx_fin-2]
+            H_old_2 = H[idx_ini-1:idx_fin-3]
+            H_old = H
+            E_old = E[idx_ini:idx_fin-2]
+            pass
+
         c = self.dt/self.dx
         c_eps = np.ones(self.epsilon_r.size)
         c_eps[:] = self.dt/self.dx / self.epsilon_r[:]
@@ -76,21 +87,25 @@ class FDTD1D():
             E[source.location] += source.function(self.t + self.dt - self.dx/2)
         self.t += self.dt
         
-        if self.dielectric != None:
+        if self.diec_ex == 1:
+            k = (1 + poles*self.dt/2) / (1 - poles*self.dt/2)
+            beta = (EPSILON_0 * residuals* self.dt) / (1 - poles*self.dt/2)
             
-            # idx_ini = self.dielectric.idx_ini
-            # idx_fin = self.dielectric.idx_fin
-            # poles = self.dielectric.poles
-            # residuals = self.dielectric.residuals
+            aux = 2 * EPSILON_0 * eps_inf + np.sum(2* np.real(beta))
+            aux2 = sigma * self.dt
+
+            E_new = (aux - aux2)/(aux + aux2)* E_old \
+                    - 2 * self.dt * ((H_old_1 - H_old_2)/self.dx \
+                    + np.real(np.sum((1+k[:,np.newaxis]) * J[:, idx_ini:idx_fin-2], axis=0)))/(aux + aux2)
             
-            # k = (1 + poles*self.dt/2) / (1 - poles*self.dt/2)
-            # beta = (EPSILON_0 * residuals* self.dt) / (1 - poles*self.dt/2)
-            
-            
-            # J = EPSILON_0 * residuals /(1j * ) 
-            
-            pass
-        
+            print((1+k[:,np.newaxis]).shape)
+            print(J[:, idx_ini:idx_fin-2].shape)
+
+            for i in range(poles.shape[0]):
+                J[i, idx_ini:idx_fin-2] = k[i]*J[i, idx_ini:idx_fin-2] + beta[i] * (E_new - E_old)/self.dt
+
+            E[idx_ini:idx_fin-2] = E_new
+            H = H_old - self.dt/self.dx * (E[1:] - E[:-1])
 
         if self.boundary == "pec":
             E[0] = 0.0
@@ -112,7 +127,10 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if True:    
+            if True:
+                if self.diec_ex == 1:
+                    plt.vlines([self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1]],[0,0],[1,1])    
+                    plt.axvspan(self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1], color='gray', alpha=0.5)  # Desde x=1 hasta x=5
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -192,7 +210,7 @@ def test_pec_dielectric():
     epsilon_vector = epsilon_r*np.ones(x.size)
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
 
-    fdtd = FDTD1D(x, "pec", epsilon_vector)
+    fdtd = FDTD1D(x, "pec", relative_epsilon_vector=epsilon_vector)
 
     spread = 0.1
     initialE = np.exp( - (x/spread)**2/2)
@@ -209,7 +227,7 @@ def test_period_dielectric():
     epsilon_vector = epsilon_r*np.ones(x.size)
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
     
-    fdtd = FDTD1D(x, "period", epsilon_vector)
+    fdtd = FDTD1D(x, "period", relative_epsilon_vector=epsilon_vector)
 
     spread = 0.1
     initialE = np.exp( - ((x-0.1)/spread)**2/2)
@@ -270,7 +288,7 @@ def test_error():
                                 
 def test_illumination():
     x = np.linspace(-0.5, 0.5, num=101)
-    fdtd = FDTD1D(x, "pec")
+    fdtd = FDTD1D(x, "pec",dielectric=None, relative_epsilon_vector=None)
     finalTime = 1.0
 
     fdtd.addSource(Source.gaussian(20, 0.5, 0.5, 0.1))
@@ -329,7 +347,7 @@ def test_pec_dielectric():
     epsilon_vector = epsilon_r*np.ones(x.size)
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
 
-    fdtd = FDTD1D(x, "pec", epsilon_vector)
+    fdtd = FDTD1D(x, "pec", relative_epsilon_vector=epsilon_vector)
 
     spread = 0.1
     initialE = np.exp( - (x/spread)**2/2)
@@ -346,7 +364,7 @@ def test_period_dielectric():
     epsilon_vector = epsilon_r*np.ones(x.size)
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
     
-    fdtd = FDTD1D(x, "period", epsilon_vector)
+    fdtd = FDTD1D(x, "period", relative_epsilon_vector=epsilon_vector)
 
     spread = 0.1
     initialE = np.exp( - ((x-0.1)/spread)**2/2)
@@ -401,7 +419,7 @@ def test_pec_block_dielectric():
     epsilon_vector = np.concatenate((np.ones(inter), epsilon_r*np.ones(x.size-inter)))
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
 
-    fdtd = FDTD1D(x, "pec", epsilon_vector)
+    fdtd = FDTD1D(x, "pec", relative_epsilon_vector = epsilon_vector)
 
     spread = 0.1
     initialE = 2*np.exp( - (x/spread)**2/2)
@@ -464,18 +482,27 @@ def  test_dispersive_block():
         
 def test_dispersive_panel():
     num=201
-    x = np.linspace(-0.5, 0.5, num)
-    fdtd = FDTD1D(x, "pec")
     
     idx_ini = 150
     idx_fin = num
+    eps_inf = 1  #Buscar que valores poner
+    sigma = 0    #Buscar que valores poner
+    poles = np.array([ 0, 0, 0, 0])
+    residuals = np.array([ 0, 0, 0, 0])
+
+    dielectric = {
+            "idx_ini":idx_ini,
+            "idx_fin":idx_fin,
+            "eps_inf":eps_inf,
+            "sigma":sigma,
+            "poles":poles,
+            "residuals":residuals,
+        }
+
+    x = np.linspace(-0.5, 0.5, num)
+    fdtd = FDTD1D(x, "pec", dielectric = dielectric)
     
-    poles = np.array([ 1, 1.5, 1.2, 4])
-    residuals = np.array([ 0.5, .9, 1.1, 4.8])
-    
-    fdtd.set_dielectric(idx_ini, idx_fin, poles, residuals)
-    
-    spread = 0.1
+    spread = 0.01
     initialE = np.exp( - (x/spread)**2/2)
 
     fdtd.setE(initialE)

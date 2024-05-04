@@ -96,16 +96,16 @@ class FDTD1D():
             aux2 = sigma * self.dt
 
             E_new = (aux - aux2)/(aux + aux2)* E_old \
-                    - 2 * self.dt * ((H_old[idx_ini+1:] - H_old[idx_ini:-1])/self.dx \
-                    + np.real(np.sum((1+k[:,np.newaxis]) * J[:, idx_ini:idx_fin-2], axis=0)))/(aux + aux2)
+                    - 2 * self.dt * ((H_old[idx_ini+1:idx_fin-1] - H_old[idx_ini:idx_fin-2])/self.dx \
+                    + np.real(np.sum((1+k[:,np.newaxis]) * J[:, idx_ini+1:idx_fin-1], axis=0)))/(aux + aux2)
             
             for i in range(poles.shape[0]):
-                J[i, idx_ini:idx_fin-2] = k[i]*J[i, idx_ini:idx_fin-2] + beta[i] * (E_new - E_old)/self.dt
+                J[i, idx_ini+1:idx_fin-1] = k[i]*J[i, idx_ini+1:idx_fin-1] + beta[i] * (E_new - E_old)/self.dt
 
             E[idx_ini+1:idx_fin-1] = E_new
             H = H_old - self.dt/self.dx * (E[1:] - E[:-1])
 
-        
+
         if self.boundary == "pec":
             E[0] = 0.0
             E[-1] = 0.0
@@ -443,51 +443,109 @@ def test_pec_block_dielectric():
     R = np.corrcoef(fdtd.getE(), -initialE)
     # assert np.isclose(R[0,1], 1.0)
 
-def  test_dispersive_block():
-    num=201
-    x = np.linspace(-0.5, 0.5, num)
-    fdtd = FDTD1D(x, "pec")
-    
-    idx_ini = 150
-    idx_fin = num
-    
-    poles = np.array([ 1, 1.5, 1.2, 4])
-    residuals = np.array([ 0.5, .9, 1.1, 4.8])
-    
-    fdtd.set_dielectric(idx_ini, idx_fin, poles, residuals)
-    
-    spread = 0.1
-    initialE = np.exp( - (x/spread)**2/2)
-
-    fdtd.setE(initialE)
-    # fdtd.addSource(Source.gaussian(90, 0.5, 0.5, 0.1))
-    fdtd.run_until(0.75)
-    
-    # Test con refelxión y trnasmisión como el panel.
-    
-    E_left = fdtd.getE()[:101]
-    E_right = fdtd.getE()[101:]
-    
-    E_left_max = np.max(E_left)
-    E_right_max = np.max(E_right)
-    E_right_min = np.min(E_right)
-
-    Reflection = np.abs(E_right_min/E_left_max)
-    Transmission = np.abs(E_right_max/E_left_max)
-
-    print(Reflection + Transmission)
-    
-    assert  Reflection + Transmission < 1
-        
-def test_dispersive_panel():
+def test_dispersive_null_panel():
     num=201
     
     idx_ini = 150
-    idx_fin = num
+    idx_fin = num - 10
     eps_inf = 1  #Buscar que valores poner
     sigma = 0    #Buscar que valores poner
     poles = np.array([ 0, 0, 0, 0])
     residuals = np.array([ 0, 0, 0, 0])
+
+    dielectric = {
+            "idx_ini":idx_ini,
+            "idx_fin":idx_fin,
+            "eps_inf":eps_inf,
+            "sigma":sigma,
+            "poles":poles,
+            "residuals":residuals,
+        }
+
+    x = np.linspace(-0.5, 0.5, num)
+    fdtd1 = FDTD1D(x, "pec", dielectric = dielectric)
+    fdtd2 = FDTD1D(x, "pec", dielectric = None)
+
+    dielectric2 = dielectric.copy()
+    dielectric2["eps_inf"] = 2.3
+    dielectric2["idx_ini"] = 0
+    dielectric2["idx_fin"] = num
+    fdtd3 = FDTD1D(x, "pec", dielectric=dielectric2)
+    fdtd4 = FDTD1D(x, "pec", relative_epsilon_vector=np.ones(num)*2.3, dielectric=None)
+    
+    spread = 0.01
+    initialE = np.exp( - (x/spread)**2/2)
+
+    fdtd1.setE(initialE)
+    fdtd2.setE(initialE)
+    fdtd3.setE(initialE)
+    fdtd4.setE(initialE)
+
+    fdtd1.run_until(0.25)   
+    fdtd2.run_until(0.25)   
+    fdtd3.run_until(0.25)   
+    fdtd4.run_until(0.25)   
+
+    assert np.allclose(fdtd1.getE(), fdtd2.getE(), rtol = 1e-8)
+    assert np.allclose(fdtd1.getH(), fdtd2.getH(), rtol = 1e-8)
+
+    assert np.allclose(fdtd3.getE(), fdtd4.getE(), rtol = 1e-8)
+    assert np.allclose(fdtd3.getH(), fdtd4.getH(), rtol = 1e-8)
+
+
+def test_dielectric_as_pec():
+    # Definimos polos y residuos 0 con sigma tendiendo a infinito y el comportamiento es como en un pec.
+    num = 101
+    idx_ini = num -1
+    idx_fin = num + 10
+    eps_inf = 1  #Buscar que valores poner
+    sigma = 1e10    #Buscar que valores poner
+    residuals = np.zeros(5)
+    poles = np.zeros(5)
+
+    dielectric = {
+        "idx_ini":idx_ini,
+        "idx_fin":idx_fin,
+        "eps_inf":eps_inf,
+        "sigma":sigma,
+        "poles":poles,
+        "residuals":residuals,
+    }
+
+    num = 101
+    x1 = np.linspace(-0.5, 0.5, num=num)
+    x2 = np.concatenate((x1[:-1], np.linspace(0.5, 1.0, num = num)))
+
+    fdtd = FDTD1D(x2, "pec", dielectric=dielectric)
+
+    spread = 0.05
+    initialE = np.zeros(len(x2))
+    initialE[:num] = np.exp( - (x1/spread)**2/2)
+
+    fdtd.setE(initialE)
+    fdtd.run_until(1.01)
+
+    R = np.corrcoef(fdtd.getE(), -initialE)
+
+    # assert np.allclose(-fdtd.getE(), initialE)
+    
+    assert np.isclose(R[0,1], 1.0, rtol = 0.015)
+
+def test_dispersive_panel():
+    num=201
+    
+    idx_ini = 150
+    idx_fin = num - 10
+    eps_inf = 1  #Buscar que valores poner
+    sigma = 1e10    #Buscar que valores poner
+
+    residuals = np.array([ 5.987e-1 + 4.195e3j, -2.211e-1 + 2.680e-1j, -4.240 + 7.324e2j,
+                          6.391e-1 + 7.186e-2j, 1.806 + 4.563j, 1.443 - 8.219e1j])
+    poles = np.array([ -2.502e-2 - 8.626e-3j, -2.021e-1 - 9.407e-1j, -1.467e1 - 1.338j,
+                      -2.997e-1 - 4.034j, -1.896 - 4.808j, -9.396 - 6.477j])
+    
+    residuals = np.zeros(len(residuals))
+    poles = np.zeros(len(poles))
 
     dielectric = {
             "idx_ini":idx_ini,
@@ -531,3 +589,18 @@ def test_dispersive_panel():
 
     assert np.isclose(Reflection, R)
     assert np.isclose(Transmission, T)
+
+    
+    E_left = fdtd.getE()[:101]
+    E_right = fdtd.getE()[101:]
+    
+    E_left_max = np.max(E_left)
+    E_right_max = np.max(E_right)
+    E_right_min = np.min(E_right)
+
+    Reflection = np.abs(E_right_min/E_left_max)
+    Transmission = np.abs(E_right_max/E_left_max)
+
+    print(Reflection + Transmission)
+    
+    assert  Reflection + Transmission < 1

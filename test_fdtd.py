@@ -64,12 +64,13 @@ class FDTD1D():
             poles = self.dielectric["poles"]
             residuals = self.dielectric["residuals"]
 
-            print(idx_ini+1, idx_fin-1)
-            print(idx_ini, idx_fin-2)
-            H_old_1 = H[idx_ini:idx_fin-2]
-            H_old_2 = H[idx_ini-1:idx_fin-3]
+            # H_old_1 = H[idx_ini+1:idx_fin-1].copy()
+            # H_old_2 = H[idx_ini:idx_fin-2].copy()
+            H_old = np.zeros_like(H)
             H_old = H
-            E_old = E[idx_ini:idx_fin-2]
+            # E_old = np.zeros_like(E[idx_ini+1:idx_fin-1])
+            # E_old = E[idx_ini+1:idx_fin-1]
+            E_old = E[idx_ini+1:idx_fin-1].copy()
             pass
 
         c = self.dt/self.dx
@@ -95,18 +96,16 @@ class FDTD1D():
             aux2 = sigma * self.dt
 
             E_new = (aux - aux2)/(aux + aux2)* E_old \
-                    - 2 * self.dt * ((H_old_1 - H_old_2)/self.dx \
+                    - 2 * self.dt * ((H_old[idx_ini+1:] - H_old[idx_ini:-1])/self.dx \
                     + np.real(np.sum((1+k[:,np.newaxis]) * J[:, idx_ini:idx_fin-2], axis=0)))/(aux + aux2)
             
-            print((1+k[:,np.newaxis]).shape)
-            print(J[:, idx_ini:idx_fin-2].shape)
-
             for i in range(poles.shape[0]):
                 J[i, idx_ini:idx_fin-2] = k[i]*J[i, idx_ini:idx_fin-2] + beta[i] * (E_new - E_old)/self.dt
 
-            E[idx_ini:idx_fin-2] = E_new
+            E[idx_ini+1:idx_fin-1] = E_new
             H = H_old - self.dt/self.dx * (E[1:] - E[:-1])
 
+        
         if self.boundary == "pec":
             E[0] = 0.0
             E[-1] = 0.0
@@ -129,7 +128,7 @@ class FDTD1D():
         while (self.t <= finalTime):
             if True:
                 if self.diec_ex == 1:
-                    plt.vlines([self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1]],[0,0],[1,1])    
+                    plt.vlines([self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1]],[-1,-1],[1,1], color='red')    
                     plt.axvspan(self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1], color='gray', alpha=0.5)  # Desde x=1 hasta x=5
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')

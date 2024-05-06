@@ -126,7 +126,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if True:
+            if False:
                 if self.diec_ex == 1:
                     plt.vlines([self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1]],[-1,-1],[1,1], color='red')    
                     plt.axvspan(self.xE[self.dielectric["idx_ini"]],self.xE[self.dielectric["idx_fin"]-1], color='gray', alpha=0.5)  # Desde x=1 hasta x=5
@@ -493,7 +493,7 @@ def test_dispersive_null_panel():
     assert np.allclose(fdtd3.getH(), fdtd4.getH(), rtol = 1e-8)
 
 
-def test_dielectric_as_pec():
+def test_dispersive_as_pec():
     # Definimos polos y residuos 0 con sigma tendiendo a infinito y el comportamiento es como en un pec.
     num = 101
     idx_ini = num -1

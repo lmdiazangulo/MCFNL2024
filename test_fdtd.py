@@ -81,7 +81,7 @@ class FDTD1D():
         E_aux_izq = E[1]
         E_aux_dch= E[-2]
 
-        H = H *  (c_mu2 / c_mu) + self.dt/self.dx *(E[1:] - E[:-1]) / c_mu
+        H[:] = H[:] *  (c_mu2 / c_mu) - self.dt/self.dx *(E[1:] - E[:-1]) / c_mu
         
         for source in self.sources:
             H[source.location] += source.function(self.t + self.dt/2)
@@ -113,7 +113,7 @@ class FDTD1D():
 
     def run_until(self, finalTime):
         while (self.t <= finalTime):
-            if False:    
+            if True:    
                 plt.plot(self.xE, self.E, '.-')
                 plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
@@ -448,26 +448,45 @@ def test_energy_conservation():
 
     assert np.isclose(initial_energy, final_energy, atol=1e-3)
     
-    def test_pml():
-        x = np.linspace(-1.0, 1.0, num=201)
-        epsilon_r = 1
-        sigma_e = 0.01
-        sigma_m = sigma_e * MU_0 / EPSILON_0
-        inter = 101
-        pml_size = 50
-        #epsilon_vector = np.ones_like(x)
-        epsilon_vector = np.concatenate((epsilon_r*np.ones(pml_size), np.ones(inter), epsilon_r*np.ones(pml_size)))
-        
-        sigma_e_vector = np.concatenate((sigma_e*np.ones(pml_size), sigma_e * np.zeros(inter), sigma_e*np.ones(pml_size)))
-        sigma_m_vector = np.concatenate((sigma_m*np.ones(pml_size-1), sigma_m * np.zeros(inter+1), sigma_e*np.ones(pml_size-1)))
+def test_pml():
+    x = np.linspace(-1.0, 1.0, num=201)
+    inter = 101
+    pml_size = 50
+    dx = np.abs(x[1] - x[2])
 
+    epsilon_r = 1
+    sigma_e_max = 7
 
-        time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
+    #sigma_m = sigma_e_max * MU_0 / EPSILON_0
+    
+    k = (sigma_e_max/(pml_size-1)**2)
+    perfil_parabolico_e = [k*(a-pml_size+1)**2 for a in range(pml_size)]
+    perfil_parabolico_invertido_e = perfil_parabolico_e[::-1]
+    
+    #epsilon_vector = np.ones_like(x)
+    epsilon_vector = np.concatenate((epsilon_r*np.ones(pml_size), 1.0*np.ones(inter), epsilon_r*np.ones(pml_size)))
+    
+    sigma_e_vector = np.concatenate((perfil_parabolico_e, 1.0*np.zeros(inter), perfil_parabolico_invertido_e))
+    sigma_m_vector = (sigma_e_vector[1:]+sigma_e_vector[-1:])*0.5* MU_0 / EPSILON_0
 
-        fdtd = FDTD1D(x, "pec", epsilon_vector, sigma_e_vector, sigma_m_vector)
+    time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
 
-        spread = 0.1
-        initialE = 2*np.exp( - (x/spread)**2/2)
+    fdtd = FDTD1D(x, "pec", epsilon_vector, sigma_e_vector, sigma_m_vector)
 
-        fdtd.setE(initialE)
-        fdtd.run_until(1)
+    spread = 0.1
+    initialE = 2*np.exp( - (x/spread)**2/2)
+
+    fdtd.setE(initialE)
+
+    def energy(E, H):
+        electric = epsilon_r * np.sum([campo**2 for campo in E])  
+        magnetic = MU_0 * np.sum([campo**2 for campo in H])  
+        return (electric + magnetic) * dx
+
+    initial_energy = energy(initialE, fdtd.getH())
+
+    fdtd.run_until(2)
+
+    final_energy = energy(fdtd.getE(), fdtd.getH()) 
+
+    assert final_energy/initial_energy < 1 

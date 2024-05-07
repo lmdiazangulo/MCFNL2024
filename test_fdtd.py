@@ -86,7 +86,7 @@ class FDTD1D():
         for source in self.sources:
             H[source.location] += source.function(self.t + self.dt/2)
         
-        E[1:-1] += - c_eps[1:-1] * (H[1:] - H[:-1])
+        E[1:-1] *  (c_eps2[1:-1] / c_eps3[1:-1]) + c_eps[1:-1] * (H[1:] - H[:-1])
         
         for source in self.sources:
             E[source.location] += source.function(self.t + self.dt - self.dx/2)

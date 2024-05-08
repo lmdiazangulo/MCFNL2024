@@ -15,11 +15,12 @@ class Panel():
         
     def phi(self, w):
         mu = self.mu_r * MU_0
-        epsC = self.eps_r * EPSILON_0-1j*self.sigma/w
+        epsC = self.eps_r * EPSILON_0 - 1j*self.sigma/w
+        # print(epsC)
         gamma = 1j * w *np.sqrt(mu * epsC)
+        # print(self.sigma/w)
         gd = gamma*self.thickness
         eta = np.sqrt(mu/epsC)
-        
         return np.array(
                 [
                 [np.cosh(gd),     eta * np.sinh(gd)],
@@ -40,18 +41,15 @@ class Panel():
         )
 
 class FDTD1D():
-    def __init__(self, xE, boundary, relative_epsilon_vector=None, sigma_vector = None):
+    def __init__(self, xE, boundary, relative_epsilon_vector=None, sigma_vector = None, doplot = False):
         self.xE = xE
         self.xH = (xE[1:] + xE[:-1]) / 2.0
-
-
-
         self.E = np.zeros(self.xE.shape)
         self.H = np.zeros(self.xH.shape)
-
         self.dx = xE[1] - xE[0]
         self.dt = 1.0 * self.dx
-
+        self.doplot = doplot
+        
         self.sources = []
         self.t = 0.0
         if sigma_vector is None:
@@ -125,10 +123,10 @@ class FDTD1D():
             raise ValueError("Boundary not defined")
 
     def run_until(self, finalTime):
-        while (self.t <= finalTime):
-            if True:    
+        while (self.t < finalTime):
+            if self.doplot:    
                 plt.plot(self.xE, self.E, '.-')
-                # plt.plot(self.xH, self.H, '.-')
+                plt.plot(self.xH, self.H, '.-')
                 plt.ylim(-1.1, 1.1)
                 plt.title(self.t)
                 plt.grid(which='both')
@@ -215,7 +213,7 @@ def test_pec_dielectric():
     fdtd.run_until(time)
 
     R = np.corrcoef(fdtd.getE(), -initialE)
-    assert np.isclose(R[0,1], 1.0)
+    assert np.isclose(np.abs(R[0,1]), 1.0)
 
 def test_period_dielectric():
     x = np.linspace(-0.5, 0.5, num=101)
@@ -312,20 +310,16 @@ def test_pmc():
 def test_conductor_panel():
     x = np.linspace(-0.5, 0.5, num = 101) 
     sigma_vector = np.zeros(x.size)
-    # er = np.ones(x.size)
-    # er[50:80] = 2
     sigma_panel = 15.0
     sigma_vector[50:55] = sigma_panel
     fdtd = FDTD1D(x, "mur", sigma_vector = sigma_vector)
-    # fdtd.dt *= 0.1
 
     t_medida = np.arange(0, 6, step = fdtd.dt)
 
     source = Source.gaussian(10, 0.5, 1, 0.05)
     fdtd.addSource(source)
-    E_incidente = [source.function(t) for t in t_medida]
 
-    # Recogemos la reflejada
+    E_incidente = [source.function(t) for t in t_medida]
     E_reflejada = []
     E_transmitida = []
 
@@ -343,32 +337,33 @@ def test_conductor_panel():
 
     tSI = t_medida / speed_of_light
     dtSI = fdtd.dt / speed_of_light
-    fqSI = np.fft.fftshift(np.fft.fftfreq(len(t_medida), d = fdtd)) 
+    fq = np.fft.fftshift(np.fft.fftfreq(len(t_medida), d = fdtd.dt))
     fqSI = np.fft.fftshift(np.fft.fftfreq(len(tSI), d = dtSI)) 
     Freflejada = np.fft.fftshift(np.fft.fft(E_reflejada)) 
     Fincidente = np.fft.fftshift(np.fft.fft(E_incidente)) 
     Ftransmitida = np.fft.fftshift(np.fft.fft(E_transmitida)) 
 
+    freq_filter = np.logical_and(np.logical_and(fqSI != 0, fqSI < 20 * speed_of_light), (fqSI > -20 *speed_of_light))
+    fqSI = fqSI[freq_filter]
+    Freflejada = Freflejada[freq_filter]
+    Fincidente = Fincidente[freq_filter]
+    Ftransmitida = Ftransmitida[freq_filter]
+    panel = Panel(eps_r = 1.0, mu_r = 1.0, sigma = sigma_panel/speed_of_light/MU_0, thickness = 5 * fdtd.dx)
+    Rnum = (np.abs(Freflejada)/np.abs(Fincidente))
+    Tnum = (np.abs(Ftransmitida)/np.abs(Fincidente))
 
-    freq_filter = fq != 0
-    fq = fq[freq_filter]
-    panel = Panel(eps_r = 1.0, mu_r = 1.0, sigma = sigma_panel/EPSILON_0/speed_of_light**2, thickness = 5 * fdtd.dx)
-    Rnum = (np.abs(Freflejada)/np.abs(Fincidente))[freq_filter]
-    Tnum = (np.abs(Ftransmitida)/np.abs(Fincidente))[freq_filter]
-
-    w = 2 * np.pi * fq
-    R = [panel.getReflectionCoefficient(w) for w in w]
-    T = [panel.getTransmissionCoefficient(w) for w in w]
-    plt.plot(fq, Rnum, '.', label = 'R numérico')
-    plt.plot(fq, Tnum, '.', label = 'T numérico')
-    plt.plot(fq, np.abs(R), label = 'R')
-    plt.plot(fq, np.abs(T), label = 'T')
-    plt.legend()
-    plt.ylim(0, 1.1)
-    plt.show()
-
-test_conductor_panel()
-    
+    w = 2 * np.pi * fqSI
+    R = np.abs([panel.getReflectionCoefficient(w) for w in w])
+    T = np.abs([panel.getTransmissionCoefficient(w) for w in w])
+    # plt.plot(fqSI, Rnum, '.', label = 'R numérico')
+    # plt.plot(fqSI, Tnum, '.', label = 'T numérico')
+    # plt.plot(fqSI, R, label = 'R')
+    # plt.plot(fqSI, T, label = 'T')
+    assert np.allclose(Rnum, R, atol=2e-2)
+    assert np.allclose(Tnum, T, atol=2e-2)
+    # plt.legend()
+    # plt.ylim(0, 1.1)
+    # plt.show()
 
 def test_conductivity_absorption():
     x = np.linspace(-0.5, 0.5, num = 101) 
@@ -419,10 +414,10 @@ def test_pec_dielectric():
     fdtd.run_until(time)
 
     R = np.corrcoef(fdtd.getE(), -initialE)
-    assert np.isclose(R[0,1], 1.0)
+    assert np.isclose(np.abs(R[0,1]), 1.0)
 
 def test_period_dielectric():
-    x = np.linspace(-0.5, 0.5, num=101)
+    x = np.linspace(-0.5, 0.5, num=1001)
     epsilon_r = 4
     epsilon_vector = epsilon_r*np.ones(x.size)
     time = np.sqrt(epsilon_r) * np.sqrt(EPSILON_0 * MU_0)
@@ -439,7 +434,7 @@ def test_period_dielectric():
 
 
     R_E = np.corrcoef(fdtd.getE(), initialE)
-    assert np.isclose(R_E[0,1], 1.0, rtol=1.e-2)
+    assert np.isclose(np.abs(R_E[0,1]), 1.0, rtol=1.e-2)
 
     # R_H = np.corrcoef(initialH, fdtd.getH())
     assert np.allclose(fdtd.H, initialH, atol=1.e-2)

@@ -327,13 +327,6 @@ def test_conductor_panel():
         E_reflejada.append(fdtd.getE()[5])
         E_transmitida.append(fdtd.getE()[-10])
         fdtd.step()
-        # plt.plot(fdtd.xE, fdtd.E, '.-')
-        # # plt.plot(self.xH, self.H, '.-')
-        # plt.ylim(-1.1, 1.1)
-        # plt.title(fdtd.t)
-        # plt.grid(which='both')
-        # plt.pause(0.02)
-        # plt.cla()
 
     tSI = t_medida / speed_of_light
     dtSI = fdtd.dt / speed_of_light
@@ -355,16 +348,9 @@ def test_conductor_panel():
     w = 2 * np.pi * fqSI
     R = np.abs([panel.getReflectionCoefficient(w) for w in w])
     T = np.abs([panel.getTransmissionCoefficient(w) for w in w])
-    # plt.plot(fqSI, Rnum, '.', label = 'R numérico')
-    # plt.plot(fqSI, Tnum, '.', label = 'T numérico')
-    # plt.plot(fqSI, R, label = 'R')
-    # plt.plot(fqSI, T, label = 'T')
     assert np.allclose(Rnum, R, atol=2e-2)
     assert np.allclose(Tnum, T, atol=2e-2)
-    # plt.legend()
-    # plt.ylim(0, 1.1)
-    # plt.show()
-
+   
 def test_conductivity_absorption():
     x = np.linspace(-0.5, 0.5, num = 101) 
     sigma_vector = np.zeros(x.size)

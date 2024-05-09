@@ -5,21 +5,24 @@ from test_fdtd import *
 from scipy.constants import speed_of_light
 
 def main():
-    sigma_panel = 15.0
+    sigma_panel = 5.0
+    eps_r = 4.0
     panel_iindex = 50
-    panel_findex = 55
+    panel_findex = 80
     show_animation = True
     
     x = np.linspace(-0.5, 0.5, num = 101) 
     sigma_vector = np.zeros(x.size)
+    epsr_vector = np.ones(x.size)
     panel_thickness = panel_findex - panel_iindex
-    
-    sigma_vector[panel_iindex:panel_findex] = sigma_panel
-    fdtd = FDTD1D(x, "mur", sigma_vector = sigma_vector)
 
-    source_length = 0.1
-    source = Source.gaussian(10, source_length * 10, 1, source_length/2)
-    t_medida = np.arange(0, source_length * 25, step = fdtd.dt)
+    epsr_vector[panel_iindex:panel_findex] = eps_r
+    sigma_vector[panel_iindex:panel_findex] = sigma_panel
+    fdtd = FDTD1D(x, "mur", sigma_vector = sigma_vector, relative_epsilon_vector = epsr_vector)
+
+    source_length = 0.10
+    source = Source.gaussian(10, source_length * 5, 1, source_length/2)
+    t_medida = np.arange(0, source_length * 20, step = fdtd.dt)
     fdtd.addSource(source)
 
     E_incidente = [source.function(t) for t in t_medida]
@@ -74,6 +77,7 @@ def main():
     plt.plot(fqSI, R, label = 'R')
     plt.plot(fqSI, T, label = 'T')
     plt.xscale("log")
+    plt.xlabel("f(Hz)")
     plt.legend()
     plt.ylim(0, 1.1)
     plt.savefig("coeffs.png", dpi = 300)
@@ -81,6 +85,8 @@ def main():
     plt.plot(tSI, E_incidente,  label = "E incidente")
     plt.plot(tSI, E_reflejada,  label = "E reflejado")
     plt.plot(tSI, E_transmitida,  label = "E transmitido")
+    plt.xlabel("t")
+    plt.ylabel("E")
     plt.legend()
     plt.savefig("time_domain.png", dpi = 300)
 
